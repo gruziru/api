@@ -1,0 +1,1834 @@
+openapi: 3.0.1
+info:
+  title: order-client-api
+  description: Внешнее API клиентского заказа для клиента
+  version: 2.0.0
+servers:
+  - url: https://preprod.gruzi.ru
+    description: "Препрод"
+  - url: https://go.gruzi.ru
+    description: "Продуктив"
+paths:
+  /oboz2-order-client-api/v1/messages:
+    post:
+      summary: Отправка сообщений в систему
+      operationId: fetchPostMessages
+      tags:
+        - orders api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostMessagesRequest"
+      responses:
+        "202":
+          description: Сообщения приняты в обработку
+        "400":
+          description: Прочие ошибки
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Errors"
+        "401":
+          description: Обратившийся не авторизован
+        "403":
+          description: Нет доступа
+    get:
+      summary: Получение от системы списка новых событий
+      parameters:
+        - in: query
+          name: last_created_at
+          description: >-
+            Момент времени в UTC создания сообщения по последнему принятому
+            клиентом событию (поле createdAt секции EventMessageHeader). В ответ
+            будут отданы все сообщения, созданные после этого момента времени.
+            По умолчанию отдаются все сообщения, начиная с момента регистрации
+            получателя в системе
+          required: false
+          schema:
+            type: string
+            format: date-time
+            example: "2016-11-21T08:00:00.000Z"
+        - in: query
+          name: limit
+          description: >-
+            Предельное количество извлекаемых запросом событий. По умолчанию -
+            1000 шт.
+          required: false
+          schema:
+            type: integer
+            default: 1000
+            example: 100
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventMessages"
+        "400":
+          description: Прочие ошибки
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Обратившийся не авторизован
+        "403":
+          description: Нет доступа
+  /oboz2-security-auth-tokenizer/v1/login:
+    post:
+      description: "Получение пользовательского токена авторизации от платформы Грузи.ру"
+      tags:
+        - auth tokenizer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginDTO'
+      responses:
+        200:
+          description: ОК
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenDTO"
+        401:
+          description: Ошибка
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthError"
+  /oboz2-security-auth-tokenizer/v1/refresh:
+    post:
+      summary: Обновление токена
+      operationId: refresh
+      tags:
+        - auth tokenizer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshDTO'
+      responses:
+        200:
+          description: ОК
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenDTO"
+        401:
+          description: Ошибка
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthError"
+                
+  /oboz2-dictionary-resource-types-crud/v1/internal/dropdown_with_title:
+    get:
+      tags:
+        - resource types dictionary
+      responses:
+        200:
+          description: ОК
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceTypesDictionary'
+        401:
+          description: "Доступ запрещен, нужно получить или обновить токен авторизации /oboz2-security-auth-tokenizer/v1/*"
+
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    PostMessagesRequest:
+      description: Пачка отправленных клиентом сообщений
+      type: array
+      items:
+        anyOf:
+          - $ref: "#/components/schemas/UpdateApiSettingsMessage"
+          - $ref: "#/components/schemas/CreateOrderMessage"
+          - $ref: "#/components/schemas/UpdateOrderMessage"
+          - $ref: "#/components/schemas/CancelOrderMessage"
+          - $ref: "#/components/schemas/CreateTrackingOrderMessage"
+    UpdateApiSettingsMessage:
+      description: Входящее сообщение об обновлении настроек
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/PostMessageHeader"
+        body:
+          $ref: "#/components/schemas/ApiSettings"
+      required:
+        - header
+        - body
+    CreateOrderMessage:
+      description: Входящее сообщение о создании заказа
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/PostMessageHeader"
+        body:
+          $ref: "#/components/schemas/CreateOrderBody"
+        receiverData:
+          $ref: "#/components/schemas/ReceiverPostData"
+      required:
+        - header
+        - body
+    UpdateOrderMessage:
+      description: Входящее сообщение об обновлении заказа
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/PostMessageHeader"
+        body:
+          $ref: "#/components/schemas/CreateOrderBody"
+      required:
+        - header
+        - body
+    CancelOrderMessage:
+      description: Входящее сообщение об удалении создании заказа
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/PostMessageHeader"
+        body:
+          $ref: "#/components/schemas/CancelOrderBody"
+      required:
+        - header
+        - body
+    CreateTrackingOrderMessage:
+      description: Входящее сообщение о создании заказа на трекинг
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/PostMessageHeader"
+        body:
+          $ref: "#/components/schemas/CreateTrackingOrderBody"
+        receiverData:
+          $ref: "#/components/schemas/ReceiverPostData"
+      required:
+        - header
+        - body
+    PostMessageHeader:
+      description: Заголовок входящего сообщения
+      type: object
+      properties:
+        uuid:
+          description: UUID сообщения
+          type: string
+          format: uuid
+          example: 6F9619FF-8B00-D011-B42D-00CF4FC964FF
+        version:
+          description: SemVer-версия API, для которого предназначено сообщение
+          type: string
+          example: "1.0"
+        type:
+          description: Тип сообщения
+          type: string
+          enum:
+            - createOrder
+            - createTrackingOrder
+            - updateSettings
+            - changeOrderResourceType
+            - cancelOrder
+          example: createOrder
+        createdAt:
+          description: Дата и время создания сообщения
+          type: string
+          format: date-time
+          example: "2020-09-23T08:47:00.333Z"
+        senderContractorInn:
+          description: ИНН отправителя сообщения
+          type: string
+          example: "7705739450"
+        senderContractorKpp:
+          description: КПП отправителя сообщения
+          type: string
+          example: "771401001"
+        transportOperatorInn:
+          description: ИНН оператора по передаче сообщения
+          type: string
+          example: "7726630679"
+        receiverContractorInn:
+          description: ИНН получателя сообщения
+          type: string
+          example: "7726630679"
+        receiverContractorKpp:
+          description: КПП получателя сообщения
+          type: string
+          example: "7726630679"
+        senderSystemCode:
+          description: Идентификатор системы-отправителя
+          type: string
+          example: oboz_prod_msk1
+        manualSend:
+          description: Признак отправки запроса вручную
+          type: boolean
+          example: false
+        isTest:
+          description: >-
+            Признак тестового запроса. Такой запрос должен полностью
+            обрабатываться, но не приводить к изменению системы - настройки не
+            должны примяняться, сформированное сообщение по заказу не должно
+            помещаться в журнал новых заказов и т.д.
+          type: boolean
+          example: true
+      required:
+        - uuid
+        - version
+        - type
+        - createdAt
+        - senderContractorInn
+        - senderContractorKpp
+        - transportOperatorInn
+        - receiverContractorInn
+        - receiverContractorKpp
+        - senderSystemCode
+    ReceiverPostData:
+      description: >-
+        Клиент может поместить в эту секцию данные, которые будут возвращаться
+        по каждому связанному с запросом событию
+    ReceiverEventMessageData:
+      description: Клиентские данные, связанные с событием
+    ApiSettings:
+      description: Настройки API клиента
+      type: object
+      properties:
+        eventCallbackUri:
+          description: >-
+            Callback-метод в системе клиента, готовый принимать поток событий по
+            мере их возникновения
+          type: string
+          nullable: true
+          example: https://api.example.com/event-callback
+        errorCallbackUri:
+          description: >-
+            Callback-метод в системе клиента, готовый принимать поток сообщений
+            об ошибках в отправленных клиентом сообщениях
+          type: string
+          nullable: true
+          example: https://api.example.com/error-callback
+    CreateOrderBody:
+      allOf:
+        - $ref: "#/components/schemas/AbstractOrder"
+        - description: Создание заказа
+          type: object
+          properties:
+            externalId:
+              description: Идентификатор заказа в системе клиента
+              type: string
+              example: R100711813
+            needCreateAsDraft:
+              description: Создавать только как черновик?
+              default: false
+              type: boolean
+          required:
+            - externalId
+            - clientInn
+            - createdAt
+            - transportation
+    CreateTrackingOrderBody:
+      description: Создание заказа на трекинг
+      type: object
+      properties:
+        externalId:
+          description: Идентификатор заказа в системе клиента
+          type: string
+          example: R100711813
+        externalNumber:
+          description: Номер заказа в системе клиента
+          type: string
+          example: R100711813
+        clientInn:
+          description: ИНН клиента
+          type: string
+          example: "7705739450"
+        contractorInn:
+          description: ИНН контрагента, в адрес которго создаётся заказ
+          type: string
+          example: "7726630679"
+        date:
+          description: Дата заказа
+          type: string
+          format: date
+          example: "2020-09-23"
+        contractNumber:
+          description: Номер договора
+          type: string
+          example: R100711813
+        route:
+          description: Маршрут для отслеживания в рамках заказа на трекинг
+          type: array
+          items:
+            $ref: "#/components/schemas/TrackingOrderRoutePoint"
+        doerInn:
+          description: ИНН организации, осуществляющей перевозку
+          type: string
+          example: "123456789"
+        vehicleNo:
+          description: Гос. номер транспортного средства
+          type: string
+          example: A 000 AA 797
+        trailerNo:
+          description: Гос. номер прицепа
+          type: string
+          example: AA 00-00 77
+        driver:
+          description: Описание водителя
+          type: object
+          properties:
+            fio:
+              description: Фамилия имя и отчество водителя
+              type: string
+              example: Иванов Иван Иванович
+            phone:
+              description: Номер телефона для связи
+              type: string
+              example: 8-910-000-00-00
+          required:
+            - phone
+        tariff:
+          allOf:
+            - $ref: "#/components/schemas/Money"
+            - description: Тариф
+        contactPerson:
+          description: Рабочие данные контактного лица
+          type: object
+          properties:
+            fio:
+              description: ФИО
+              type: string
+              example: Сидоров Иван Васильевич
+            phone:
+              description: Телефон
+              type: string
+              example: "74957778899"
+          required:
+            - fio
+            - phone
+        comment:
+          description: Комментарий к заказу
+          type: string
+          example: Перевозка по договору №1 от 2020-09-22
+        trackingStartDt:
+          type: string
+          format: date-time
+          description: Дата и время начала трекинга
+          example: "2020-05-19T21:00:00.000Z"
+        trackingEndDt:
+          type: string
+          format: date-time
+          description: Дата и время окончания трекинга
+          example: "2020-05-19T21:00:00.000Z"
+      required:
+        - externalId
+        - clientInn
+        - vehicleNo
+        - driver
+        - route
+    CancelOrderBody:
+      description: Отмена заказа
+      type: object
+      properties:
+        externalId:
+          description: Идентификатор заказа в системе клиента
+          type: string
+          example: R100711813
+        externalNumber:
+          description: Номер заказа в системе клиента
+          type: string
+          example: R100711813
+      required:
+        - externalId
+    EventMessages:
+      description: >-
+        Список сообщений о событиях, отсортированный по дате создания сообщения
+        от самых старых к самым новым
+      type: array
+      items:
+        anyOf:
+          - $ref: "#/components/schemas/OrderCreatedEventMessage"
+          - $ref: "#/components/schemas/OrderUpdatedEventMessage"
+          - $ref: "#/components/schemas/OrderSignedEventMessage"
+          - $ref: "#/components/schemas/OrderResourcesAssignedEventMessage"
+          - $ref: "#/components/schemas/OrderCancelledEventMessage"
+          - $ref: "#/components/schemas/OrderExecutionStartedEventMessage"
+          - $ref: "#/components/schemas/OrderExecutedEventMessage"
+          - $ref: "#/components/schemas/OrderExecutionConfirmedEventMessage"
+          - $ref: "#/components/schemas/TripTrackingEtaEventMessage"
+          - $ref: "#/components/schemas/TripTrackingArrivedEventMessage"
+          - $ref: "#/components/schemas/TripManualArrivedEventMessage"
+          - $ref: "#/components/schemas/TripUnloadingStartedEventMessage"
+          - $ref: "#/components/schemas/TripUnloadingEndedEventMessage"
+          - $ref: "#/components/schemas/TripReasonOfLateForArrivingEventMessage"
+          - $ref: "#/components/schemas/TrackingOrderCreatedEventMessage"
+          - $ref: "#/components/schemas/TrackingEtaEventMessage"
+          - $ref: "#/components/schemas/TrackingArrivedEventMessage"
+          - $ref: "#/components/schemas/IntegrationSpotOrderStatusEventMessage"
+    OrderCreatedEventMessage:
+      description: Событие Создание нового заказа
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/EventMessageHeader"
+        body:
+          $ref: "#/components/schemas/OrderCreatedEventBody"
+        receiverData:
+          $ref: "#/components/schemas/ReceiverEventMessageData"
+      required:
+        - header
+        - body
+    OrderUpdatedEventMessage:
+      description: Событие Обновления заказа
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/EventMessageHeader"
+        body:
+          $ref: "#/components/schemas/OrderUpdatedEventBody"
+        receiverData:
+          $ref: "#/components/schemas/ReceiverEventMessageData"
+      required:
+        - header
+        - body
+    OrderSignedEventMessage:
+      description: Событие Заказ подписан экспедитором
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/EventMessageHeader"
+        body:
+          $ref: "#/components/schemas/OrderSignedEventBody"
+        receiverData:
+          $ref: "#/components/schemas/ReceiverEventMessageData"
+      required:
+        - header
+        - body
+    OrderResourcesAssignedEventMessage:
+      description: Событие Ресурсы на заказ назначены
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/EventMessageHeader"
+        body:
+          $ref: "#/components/schemas/OrderResourcesAssignedEventBody"
+        receiverData:
+          $ref: "#/components/schemas/ReceiverEventMessageData"
+      required:
+        - header
+        - body
+    IntegrationSpotOrderStatusEventMessage:
+      description: Событие Изменен статус спотового заказа, созданного по интеграции
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/EventMessageHeader"
+        body:
+          $ref: "#/components/schemas/IntegrationSpotOrderStatusEventBody"
+        receiverData:
+          $ref: "#/components/schemas/ReceiverEventMessageData"
+      required:
+        - header
+        - body
+    OrderCancelledEventMessage:
+      description: Событие Заказ отменён перевозчиком, заказчиком или экспедитором
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/EventMessageHeader"
+        body:
+          $ref: "#/components/schemas/OrderCancelledEventBody"
+        receiverData:
+          $ref: "#/components/schemas/ReceiverEventMessageData"
+      required:
+        - header
+        - body
+    OrderExecutionStartedEventMessage:
+      description: Событие Исполнение заказа начато
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/EventMessageHeader"
+        body:
+          $ref: "#/components/schemas/OrderExecutionStartedEventBody"
+        receiverData:
+          $ref: "#/components/schemas/ReceiverEventMessageData"
+      required:
+        - header
+        - body
+    OrderExecutedEventMessage:
+      description: Событие Заказ исполнен
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/EventMessageHeader"
+        body:
+          $ref: "#/components/schemas/OrderExecutedEventBody"
+        receiverData:
+          $ref: "#/components/schemas/ReceiverEventMessageData"
+      required:
+        - header
+        - body
+    OrderExecutionConfirmedEventMessage:
+      description: Событие Исполнение заказа подтверждено
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/EventMessageHeader"
+        body:
+          $ref: "#/components/schemas/OrderExecutionConfirmedEventBody"
+        receiverData:
+          $ref: "#/components/schemas/ReceiverEventMessageData"
+      required:
+        - header
+        - body
+    TripTrackingEtaEventMessage:
+      description: Событие перевозки - ETA для точки разгрузки
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/EventMessageHeader"
+        body:
+          $ref: "#/components/schemas/TripTrackingEtaEventBody"
+        receiverData:
+          $ref: "#/components/schemas/ReceiverEventMessageData"
+      required:
+        - header
+        - body
+    TripTrackingArrivedEventMessage:
+      description: Событие перевозки - Прибытие в точку разгрузки по треку
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/EventMessageHeader"
+        body:
+          $ref: "#/components/schemas/TripTrackingArrivedEventBody"
+        receiverData:
+          $ref: "#/components/schemas/ReceiverEventMessageData"
+      required:
+        - header
+        - body
+    TripManualArrivedEventMessage:
+      description: Событие перевозки - Прибытие в точку разгрузки по данным логиста
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/EventMessageHeader"
+        body:
+          $ref: "#/components/schemas/TripManualArrivedEventBody"
+        receiverData:
+          $ref: "#/components/schemas/ReceiverEventMessageData"
+      required:
+        - header
+        - body
+    TripUnloadingStartedEventMessage:
+      description: Событие перевозки - Начало погрузо-разгрузочных работ на точке разгрузки
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/EventMessageHeader"
+        body:
+          $ref: "#/components/schemas/TripUnloadingStartedEventBody"
+        receiverData:
+          $ref: "#/components/schemas/ReceiverEventMessageData"
+      required:
+        - header
+        - body
+    TripUnloadingEndedEventMessage:
+      description: >-
+        Событие перевозки - Окончание погрузо-разгрузочных работ на точке
+        разгрузки
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/EventMessageHeader"
+        body:
+          $ref: "#/components/schemas/TripUnloadingEndedEventBody"
+        receiverData:
+          $ref: "#/components/schemas/ReceiverEventMessageData"
+      required:
+        - header
+        - body
+    TripReasonOfLateForArrivingEventMessage:
+      description: Событие перевозки - Причина опоздания на точку разгрузки
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/EventMessageHeader"
+        body:
+          $ref: "#/components/schemas/TripReasonOfLateForArrivingEventBody"
+        receiverData:
+          $ref: "#/components/schemas/ReceiverEventMessageData"
+      required:
+        - header
+        - body
+    TrackingOrderCreatedEventMessage:
+      description: Событие Создание нового трекингового заказа
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/EventMessageHeader"
+        body:
+          $ref: "#/components/schemas/TrackingOrderCreatedEventBody"
+        receiverData:
+          $ref: "#/components/schemas/ReceiverEventMessageData"
+      required:
+        - header
+        - body
+    TrackingEtaEventMessage:
+      description: Событие трекинга - ETA для точки разгрузки
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/EventMessageHeader"
+        body:
+          $ref: "#/components/schemas/TrackingEtaEventBody"
+        receiverData:
+          $ref: "#/components/schemas/ReceiverEventMessageData"
+      required:
+        - header
+        - body
+    TrackingArrivedEventMessage:
+      description: Событие трекинга - Прибытие в точку разгрузки по треку
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/EventMessageHeader"
+        body:
+          $ref: "#/components/schemas/TrackingArrivedEventBody"
+        receiverData:
+          $ref: "#/components/schemas/ReceiverEventMessageData"
+      required:
+        - header
+        - body
+    EventMessageHeader:
+      description: Стандартный заголовок события
+      type: object
+      properties:
+        uuid:
+          description: UUID события
+          type: string
+          format: uuid
+          example: 6F9619FF-8B00-D011-B42D-00CF4FC964FF
+        version:
+          description: SemVer-версия API, для которого предназначено сообщение
+          type: string
+          example: "1.0"
+        type:
+          description: Тип события
+          type: string
+          enum:
+            - orderCreated
+            - orderUpdated
+            - orderSigned
+            - orderResourcesAssigned
+            - orderCancelled
+            - orderExecutionStarted
+            - orderExecuted
+            - orderExecutionConfirmed
+            - orderInvoiceCreated
+            - orderInvoiced
+            - orderPayed
+            - tripOrderUpdated
+            - tripTrackingArrived
+            - tripTrackingEta
+            - tripManualArrived
+            - tripUnloadingStarted
+            - tripUnloadingEnded
+            - tripReasonOfLateForArriving
+            - trackingOrderCreated
+            - trackingEta
+            - trackingArrived
+            - integrationSpotOrderStatusChanged
+            - messageProcessingError
+          example: orderCreated
+        createdAt:
+          description: Дата и время создания сообщения
+          type: string
+          format: date-time
+          example: "2020-09-23T08:47:00.333Z"
+        occurredAt:
+          description: >-
+            Дата и время возникновения события (если машина остановилась, то в
+            это поле помещается время остановки машины, а не когда мы об этом
+            узнали)
+          type: string
+          format: date-time
+          example: "2020-09-23T08:47:00.009Z"
+        senderSystemCode:
+          description: Идентификатор системы-отправителя
+          type: string
+          example: oboz_prod_msk1
+        senderContractorInn:
+          description: ИНН организации-отправителя
+          type: string
+          example: "7734397465"
+        senderContractorKpp:
+          description: КПП организации-отправителя
+          type: string
+          example: "771401001"
+        receiverContractorInn:
+          description: ИНН организации-получателя
+          type: string
+          example: "7726630679"
+        receiverContractorKpp:
+          description: КПП организации-получателя
+          type: string
+          example: "7726630679"
+        manualSend:
+          description: Признак отправки события вручную
+          type: string
+          example: false
+      required:
+        - uuid
+        - version
+        - type
+        - createdAt
+        - occurredAt
+        - senderSystemCode
+        - senderContractorInn
+        - senderContractorKpp
+        - receiverContractorInn
+        - receiverContractorKpp
+    OrderCreatedEventBody:
+      allOf:
+        - $ref: "#/components/schemas/OrderUpdatedEventBody"
+        - description: Информация о созданном заказе
+    OrderUpdatedEventBody:
+      allOf:
+        - $ref: "#/components/schemas/AbstractOrder"
+        - description: Информация об обновлённом заказе
+          type: object
+          properties:
+            uuid:
+              description: Идентификатор заказа
+              type: string
+              format: uuid
+              example: 6F9619FF-8B00-D011-B42D-00CF4FC964FF
+            number:
+              description: Номер заказа
+              type: string
+              example: PO195551202
+            status:
+              $ref: "#/components/schemas/OrderStatus"
+            amount:
+              allOf:
+                - $ref: "#/components/schemas/Money"
+                - description: Стоимость исполнения заказа без учёта НДС
+            vat:
+              allOf:
+                - $ref: "#/components/schemas/Money"
+                - description: НДС в денежных единицах
+          required:
+            - uuid
+            - number
+            - status
+            - clientInn
+            - createdAt
+            - transportation
+    OrderSignedEventBody:
+      description: Поля тела сообщения о событии Заказ подписан экспедитором
+      type: object
+      properties:
+        order:
+          $ref: "#/components/schemas/SimpleOrder"
+        amount:
+          allOf:
+            - $ref: "#/components/schemas/Money"
+            - description: Стоимость исполнения заказа без учёта НДС
+        vat:
+          allOf:
+            - $ref: "#/components/schemas/Money"
+            - description: НДС в денежных единицах
+      required:
+        - order
+        - amount
+        - vat
+    OrderResourcesAssignedEventBody:
+      description: Поля тела сообщения о событии Ресурсы на заказ назначены
+      type: object
+      properties:
+        order:
+          $ref: "#/components/schemas/SimpleOrder"
+        resources:
+          description: Список ресурсов в разрезе заказов на перевозку
+          type: array
+          items:
+            $ref: "#/components/schemas/TripResource"
+      required:
+        - order
+        - resources
+    IntegrationSpotOrderStatusEventBody:
+      description: >-
+        Поля тела сообщения о событии Изменен статус спотового заказа,
+        созданного по интеграции
+      type: object
+      properties:
+        draftOrder:
+          $ref: "#/components/schemas/SimpleOrder"
+        spotDetails:
+          description: >-
+            Расширенная информация по изменению статуса спотового заказа,
+            созданного по интеграции
+          type: object
+          properties:
+            clientInn:
+              description: ИНН Клиента
+              type: string
+              example: "7705739450"
+            status:
+              $ref: "#/components/schemas/IntegrationSpotOrderStatus"
+            statusChangedAt:
+              type: string
+              format: date-time
+              description: Дата и время смены статуса спота клиента
+            spotPriceWithoutVat:
+              type: integer
+              format: int64
+              example: 2500000
+              description: Спотовая ставка без НДС в копейках
+            discountWithoutVat:
+              type: integer
+              format: int64
+              example: 2500000
+              description: Спотовая скидка без НДС в копейках
+            reasonOfRejectCode:
+              type: string
+              description: Причина отклонения спота
+      required:
+        - draftOrder
+        - spotDetails
+    OrderCancelledEventBody:
+      description: >-
+        Поля тела сообщения о событии Заказ отменён перевозчиком, заказчиком или
+        экспедитором
+      type: object
+      properties:
+        order:
+          $ref: "#/components/schemas/SimpleOrder"
+        cancellator:
+          description: Описание отменившего заказ
+          type: object
+          properties:
+            type:
+              description: Сторона сделки
+              type: string
+              enum:
+                - client
+                - expeditor
+                - carrier
+              example: expeditor
+            inn:
+              description: ИНН отменившего заказ
+              type: string
+              example: "7705739450"
+          required:
+            - type
+            - inn
+      required:
+        - order
+        - cancellator
+    OrderExecutionStartedEventBody:
+      description: Поля тела сообщения о событии Исполнение заказа начато
+      type: object
+      properties:
+        order:
+          $ref: "#/components/schemas/SimpleOrder"
+      required:
+        - order
+    OrderExecutedEventBody:
+      description: Поля тела сообщения о событии Заказ исполнен
+      type: object
+      properties:
+        order:
+          $ref: "#/components/schemas/SimpleOrder"
+      required:
+        - order
+    OrderExecutionConfirmedEventBody:
+      description: Поля тела сообщения о событии Исполнение заказа подтверждено
+      type: object
+      properties:
+        order:
+          $ref: "#/components/schemas/SimpleOrder"
+      required:
+        - order
+    AbstractTripLocationEventBody:
+      description: Абстрактный объект для описания событий на точке для заказа перевозчику
+      type: object
+      properties:
+        order:
+          $ref: "#/components/schemas/SimpleOrder"
+        tripOrder:
+          $ref: "#/components/schemas/SimpleTripOrder"
+        routePoint:
+          $ref: "#/components/schemas/Location"
+      required:
+        - order
+    TripTrackingEtaEventBody:
+      allOf:
+        - $ref: "#/components/schemas/AbstractTripLocationEventBody"
+        - description: Поля тела сообщения о событии перевозки - ETA для точки разгрузки
+          type: object
+          properties:
+            plannedTimeOfArrivalDt:
+              description: Плановое время прибытия
+              type: string
+              format: date-time
+              example: "2020-09-23T08:47:00.333Z"
+            estimatedTimeOfArrivalDt:
+              description: Ожидаемое время прибытия (ЕТА)
+              type: string
+              format: date-time
+              example: "2020-09-23T08:47:00.333Z"
+          required:
+            - plannedTimeOfArrival
+            - estimatedTimeOfArrivalDt
+    TripTrackingArrivedEventBody:
+      allOf:
+        - $ref: "#/components/schemas/AbstractTripLocationEventBody"
+        - description: >-
+            Поля тела сообщения о событии перевозки - Прибытие в точку разгрузки
+            по треку
+    TripManualArrivedEventBody:
+      allOf:
+        - $ref: "#/components/schemas/AbstractTripLocationEventBody"
+        - description: >-
+            Поля тела сообщения о событии перевозки - Прибытие в точку разгрузки
+            по данным логиста
+    TripUnloadingStartedEventBody:
+      allOf:
+        - $ref: "#/components/schemas/AbstractTripLocationEventBody"
+        - description: >-
+            Поля тела сообщения о событии перевозки - Начало
+            погрузо-разгрузочных работ на точке разгрузки
+    TripUnloadingEndedEventBody:
+      allOf:
+        - $ref: "#/components/schemas/AbstractTripLocationEventBody"
+        - description: >-
+            Поля тела сообщения о событии перевозки - Окончание
+            погрузо-разгрузочных работ на точке разгрузки
+    TripReasonOfLateForArrivingEventBody:
+      allOf:
+        - $ref: "#/components/schemas/AbstractTripLocationEventBody"
+        - description: >-
+            Поля тела сообщения о событии перевозки - Причина опоздания на точку
+            разгрузки
+          type: object
+          properties:
+            reasonCode:
+              description: Код причины
+              type: string
+            reasonTitle:
+              description: Причина
+              type: string
+              example: Опоздание разгрузки в предыдущем рейсе
+            comment:
+              description: Комментарий
+              type: string
+              example: >-
+                Остановили на сутки в городе Дубна на погранпереходе между
+                Московской и Тверской областями по подозрению в контрабанде
+                Конституции РФ
+          required:
+            - reasonTitle
+    TrackingOrderCreatedEventBody:
+      allOf:
+        - $ref: "#/components/schemas/SimpleTrackingOrder"
+        - description: Информация о созданном заказе на трекинг
+          type: object
+          properties:
+            tariff:
+              allOf:
+                - $ref: "#/components/schemas/Money"
+                - description: Стоимость исполнения заказа без учёта НДС
+            vat:
+              allOf:
+                - $ref: "#/components/schemas/Money"
+                - description: НДС в денежных единицах
+    TrackingEtaEventBody:
+      description: Поля тела сообщения о событии трекинга - ETA для точки разгрузки
+      type: object
+      properties:
+        order:
+          $ref: "#/components/schemas/SimpleTrackingOrder"
+        routePoint:
+          $ref: "#/components/schemas/Location"
+        plannedTimeOfArrivalDt:
+          description: Плановое время прибытия
+          type: string
+          format: date-time
+          example: "2020-09-23T08:47:00.333Z"
+        estimatedTimeOfArrivalDt:
+          description: Ожидаемое время прибытия (ЕТА)
+          type: string
+          format: date-time
+          example: "2020-09-23T08:47:00.333Z"
+      required:
+        - order
+        - routePoint
+        - plannedTimeOfArrival
+        - estimatedTimeOfArrivalDt
+    TrackingArrivedEventBody:
+      description: >-
+        Поля тела сообщения о событии трекинга - Прибытие в точку разгрузки по
+        треку
+      type: object
+      properties:
+        order:
+          $ref: "#/components/schemas/SimpleTrackingOrder"
+        routePoint:
+          $ref: "#/components/schemas/Location"
+      required:
+        - order
+        - routePoint
+    SimpleOrder:
+      description: Краткое описание заказа клиента
+      type: object
+      properties:
+        uuid:
+          description: Идентификатор заказа
+          type: string
+          format: uuid
+          example: 6F9619FF-8B00-D011-B42D-00CF4FC964FF
+        number:
+          description: Номер заказа
+          type: string
+          example: PO195551202
+        externalId:
+          description: Идентификатор заказа в системе клиента
+          type: string
+          example: R100711813
+        externalNumber:
+          description: Номер заказа в системе клиента
+          type: string
+          example: R100711813
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+      required:
+        - uuid
+        - number
+        - status
+    SimpleTripOrder:
+      description: Краткое описание заказа перевозчику
+      type: object
+      properties:
+        uuid:
+          description: Идентификатор заказа
+          type: string
+          format: uuid
+          example: 6F9619FF-8B00-D011-B42D-00CF4FC964FF
+        number:
+          description: Номер заказа
+          type: string
+          example: PO195551202
+        externalNumber:
+          description: Номер заказа в системе перевозчика
+          type: string
+          example: R100711813
+        status:
+          description: Статус заказа
+          type: string
+          enum:
+            - new
+            - contracted
+            - inProcess
+            - processed
+            - cancelled
+            - failed
+            - executionConfirmed
+          example: new
+      required:
+        - uuid
+        - number
+        - status
+    SimpleTrackingOrder:
+      description: Краткое описание заказа на трекинг
+      type: object
+      properties:
+        number:
+          description: Номер заказа
+          type: string
+          example: PO195551202
+        externalId:
+          description: Идентификатор заказа в системе клиента
+          type: string
+          example: R100711813
+        externalNumber:
+          description: Номер заказа в системе клиента
+          type: string
+          example: R100711813
+        status:
+          $ref: "#/components/schemas/TrackingOrderStatus"
+      required:
+        - number
+        - status
+    TripResource:
+      description: Назначенные на перевозку ресурсы
+      type: object
+      properties:
+        number:
+          description: Номер заказа на перевозку
+          type: string
+          example: PO195551202
+        carrierTitle:
+          description: Наименование компании - исполнителя
+          type: string
+          example: PO195551202
+        carrierInn:
+          description: ИНН компании - исполнителя
+          type: string
+          example: PO195551202
+        driver:
+          $ref: "#/components/schemas/ResourceDriver"
+        vehicle:
+          $ref: "#/components/schemas/ResourceVehicle"
+        trailer:
+          $ref: "#/components/schemas/ResourceTrailer"
+      required:
+        - number
+        - driver
+        - vehicle
+        - carrierTitle
+        - carrierInn
+    ResourceDriver:
+      description: Данные водителя
+      type: object
+      properties:
+        fio:
+          description: ФИО
+          type: string
+          example: Иванов Иван Иванович
+        passport:
+          description: Номер паспорта
+          type: string
+          example: "6027182980"
+        phone:
+          description: Номер телефона
+          type: string
+          example: "9267776655"
+        license:
+          description: Номер лицензии
+          type: string
+          example: "9909999088"
+        licenseDate:
+          description: Дата выдали лицензии
+          type: string
+          format: date
+          example: "2020-09-23"
+        inn:
+          description: ИНН
+          type: string
+          example: "123456789012"
+      required:
+        - fio
+        - passport
+        - phone
+        - license
+        - inn
+    ResourceVehicle:
+      description: Данные тягача
+      type: object
+      properties:
+        number:
+          description: Государственный номер
+          type: string
+          example: K714BE177
+        mark:
+          description: Марка
+          type: string
+          example: ВАЗ21053
+        ownershipForm:
+          $ref: "#/components/schemas/OwnershipForm"
+      required:
+        - number
+        - ownershipForm
+    ResourceTrailer:
+      description: Данные прицепа
+      type: object
+      properties:
+        number:
+          description: Государственный номер
+          type: string
+          example: BO482751
+        mark:
+          description: Марка
+          type: string
+          example: ВАЗ21053
+        ownershipForm:
+          $ref: "#/components/schemas/OwnershipForm"
+      required:
+        - number
+        - ownershipForm
+    OwnershipForm:
+      description: >-
+        Тип владения, rent - Аренда, leasing - Лизинг, ownProperty -
+        Собственность
+      type: string
+      enum:
+        - rent
+        - leasing
+        - ownProperty
+      example: ownProperty
+
+    Money:
+      description: Структура для описания денежных величин
+      type: object
+      properties:
+        value:
+          description: Величина в копейках
+          type: integer
+          format: int64
+          example: 1000000
+        currency:
+          description: Трёхбуквенный код валюты
+          type: string
+          example: RUR
+      required:
+        - value
+        - currency
+    AbstractOrder:
+      description: Абстрактное описание заказа
+      type: object
+      properties:
+        externalNumber:
+          description: Номер заказа в системе клиента
+          type: string
+          example: R100711813
+        clientInn:
+          description: ИНН клиента
+          type: string
+          example: "7705739450"
+        contractorInn:
+          description: ИНН контрагента, в адрес которго создаётся заказ
+          type: string
+          example: "7726630679"
+        species:
+          description: Вид заказа
+          type: string
+          enum:
+            - quota
+            - spot
+          default: quota
+          example: quota
+        type:
+          description: Тип заказа
+          type: string
+          enum:
+            - standard
+            - direct
+            - any
+          default: standard
+          example: standard
+        date:
+          description: Дата заказа
+          type: string
+          format: date
+          example: "2020-09-23"
+        createdAt:
+          description: Дата и время создания заказа
+          type: string
+          format: date-time
+          example: "2020-09-23T08:47:00.333Z"
+        contractNumber:
+          description: Номер договора
+          type: string
+          example: R100711813
+        transportation:
+          description: Описание способа транспортировки
+          type: object
+          required:
+            - resource
+            - route
+          properties:
+            way:
+              description: Способ перевозки на определяющем плече
+              type: string
+              enum:
+                - ftl
+                - rail
+                - container
+              default: ftl
+              example: ftl
+            route:
+              description: Маршрут доставки
+              type: array
+              items:
+                $ref: "#/components/schemas/OrderRoutePoint"
+            needTracking:
+              description: Признак необходимости отслеживания
+              type: boolean
+              default: false
+            numberOfVehicles:
+              description: Количество машин
+              type: integer
+            resource:
+              description: Требования к транспортному средству
+              type: object
+              required:
+                - truckBodyTypeUuid
+              properties:
+                truckBodyTypeUuid:
+                  description: UUID типа ресурса
+                  type: string
+                  format: uuid
+                  example: 88fac672-1f3c-4171-b912-c8ae45ed7805
+                loadTypes:
+                  description: Виды загрузки кузова
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - back
+                      - front
+                      - top
+                    example: back
+            tripTariff:
+              allOf:
+                - $ref: "#/components/schemas/Money"
+                - description: Тариф на перевозку (без НДС)
+        cargo:
+          description: Описание груза
+          type: object
+          required:
+            - type
+            - insurance
+          properties:
+            type:
+              type: string
+              enum:
+                - Алкогольные напитки
+                - Бакалея
+                - Бахчевые
+                - Бумага и картон
+                - Бутилированная вода
+                - Бытовая техника
+                - Бытовая химия
+                - Галантерея
+                - Детское питание
+                - Замороженная рыба и морепродукты
+                - Замороженное мясо и полуфабрикаты
+                - Замороженные овощи и фрукты
+                - Замороженные продукты питания
+                - Запчасти и расходные материалы к машинам и механизмам
+                - Игрушки
+                - Изделия из железобетона
+                - Книги, брошюры, печатная продукция
+                - Комбикорма
+                - Кондитерские изделия, шоколад, печенье, конфеты, вафли
+                - Консервы
+                - Корма для животных и другие зоотовары
+                - Косметика и товары для личной гигиены
+                - Кофе, чай
+                - Лесоматериалы
+                - Лом цветных металлов
+                - Лом черных металлов
+                - Масло растительное
+                - Машинные масла, присадки и автомобильная косметика
+                - Мебель и комплектующие к мебели
+                - Медицинская техника, оборудование и расходные материалы к ним
+                - Медицинские и лекарственные товары
+                - Металлические конструкции
+                - Металлопрокат
+                - >-
+                  Молоко и другая молочная продукция, сыры, йогурты, животные
+                  масла
+                - Мороженое
+                - Напитки безалкогольные, соки, морсы, вода
+                - Напитки слабоалкогольные
+                - Негабаритные разовые грузы
+                - Обучающее оборудование и материалы
+                - Одежда и обувь
+                - Охлажденная рыба и рыбные пресервы
+                - Охлажденное мясо и продукты мясопереработки
+                - Охлажденные продукты питания
+                - Песок
+                - Пиво и напитки пивные
+                - Пиво и напитки пивные
+                - Пиломатериалы и продукция деревообработки
+                - "Плиты ДСП, ДВП "
+                - Поддоны
+                - >-
+                  Потребительская видеоаудио электроника, компьютеры смартфоны,
+                  планшеты
+                - Продукты питания
+                - Производственные линии
+                - Промышленное оборудование, станки, механизмы
+                - Промышленные установки
+                - Сантехническое оборудование
+                - Сахар
+                - Свежие овощи и фрукты
+                - Сельскохозяйственная техника
+                - Сигареты и другая табачная продукция
+                - Скоропортящиеся продукты питания
+                - Смолы, пластмассы, клей, краски
+                - Соль
+                - Строительная техника
+                - Строительные материалы
+                - Сырьевые материалы
+                - Текстиль и ткани
+                - Товары для дома и сада
+                - Товары народного потребления
+                - Трубы
+                - Уголь
+                - Удобрения
+                - Упаковочная тара, бутылки, этикетки
+                - Фанера и шпон
+                - Химические опасные грузы
+                - Цветы, рассада
+                - Чипсы и снеки
+                - Шины, диски
+                - Щебень
+              description: Тип груза
+              example: Бакалея
+            cost:
+              allOf:
+                - $ref: "#/components/schemas/Money"
+                - description: Стоимость груза
+            insurance:
+              allOf:
+                - $ref: "#/components/schemas/Money"
+                - description: Страховая стоимость
+            weight:
+              description: Вес в килограммах
+              type: integer
+            volume:
+              description: Объём в кубических метрах
+              type: integer
+            freightUnit:
+              description: Единицы учёта груза
+              type: object
+              properties:
+                count:
+                  description: Количество единиц учёта груза
+                  type: integer
+                type:
+                  description: Единицы учёта груза
+                  type: string
+                  enum:
+                    - pallet
+                  example: pallet
+              required:
+                - type
+            isDangerous:
+              description: Признак опасного груза
+              type: boolean
+              default: false
+            temperatureLimits:
+              description: Ограничения по температуре
+              type: object
+              properties:
+                min:
+                  description: Минимальная температура в градусах Цельсия
+                  type: integer
+                  example: 4
+                max:
+                  description: Максимальная температура в градусах Цельсия
+                  type: integer
+                  example: 18
+            etsngs:
+              description: Список кодов ЕТСНГ
+              type: array
+              items:
+                type: string
+                example: "021054"
+        contactPerson:
+          description: Рабочие данные контактного лица
+          type: object
+          properties:
+            fio:
+              description: ФИО
+              type: string
+              example: Сидоров Иван Васильевич
+            phone:
+              description: Телефон
+              type: string
+              example: "74957778899"
+          required:
+            - fio
+            - phone
+        comment:
+          description: Комментарий к заказу
+          type: string
+          example: Перевозка по договору №1 от 2020-09-22
+        shipments:
+          description: Список номеров шипментов
+          type: array
+          items:
+            type: string
+            example: R100821571
+    OrderRoutePoint:
+      description: Точка маршрута
+      type: object
+      properties:
+        type:
+          description: Тип точки - погрузка, транзит или разгрузка
+          type: string
+          enum:
+            - loading
+            - unloading
+            - transit
+          example: loading
+        organizationTitle:
+          description: Наименование грузоотправителя/грузополучателя
+          type: string
+          example: ООО Рога и копыта
+        location:
+          $ref: "#/components/schemas/Location"
+        timeslot:
+          description: Плановое время посещения
+          type: object
+          required:
+            - arrive
+            - departure
+          properties:
+            arrive:
+              description: Время прибытия
+              type: string
+              format: date-time
+              example: "2020-09-23T08:47:00.333Z"
+            departure:
+              description: Время отъезда
+              type: string
+              format: date-time
+              example: "2020-09-23T08:47:00.333Z"
+            timezone:
+              description: Тайм-зона
+              type: string
+              example: RUS05
+        contact:
+          description: Контактные данные грузоотправителя/грузополучателя
+          type: object
+          properties:
+            phoneNumber:
+              description: Телефон
+              type: string
+              example: "8612774554"
+      required:
+        - type
+        - organizationTitle
+        - location
+        - timeslot
+    TrackingOrderRoutePoint:
+      description: Точка маршрута для заказа трекания
+      type: object
+      properties:
+        type:
+          description: Тип точки - погрузка, транзит или разгрузка
+          type: string
+          enum:
+            - loading
+            - unloading
+            - transit
+          example: loading
+        location:
+          $ref: "#/components/schemas/Location"
+        plannedTimeOfArrival:
+          description: Плановое время прибытия (начало слота)
+          type: string
+          format: date-time
+          example: "2020-09-23T08:47:00.333Z"
+        plannedEndTimeOfArrival:
+          description: Плановое время прибытия (окончание слота)
+          type: string
+          format: date-time
+          example: "2020-09-23T08:47:00.333Z"
+        parkingRadius:
+          type: integer
+          description: Радиус входа в зону парковки (стоянки) в метрах
+          example: 3000
+        targetRadius:
+          type: integer
+          description: Радиус входа в зону погрузки/разгрузки (целевую) в метрах
+          example: 1500
+      required:
+        - type
+        - location
+    Location:
+      description: Местоположение точки маршрута
+      type: object
+      properties:
+        address:
+          description: Адрес точки в формате Яндекс Карты или Google Maps
+          type: string
+          example: >-
+            620000, Россия, Свердловская область, Екатеринбург, Машинная улица,
+            3
+        coordinates:
+          $ref: "#/components/schemas/PointCoordinates"
+        externalCode:
+          description: Код точки в системе клиента
+          type: string
+          example: RUEC0005051350
+    PointCoordinates:
+      description: Координаты объекта
+      type: object
+      properties:
+        lat:
+          description: Широта, в градусах
+          type: number
+          example: 56.812286
+        long:
+          description: Долгота, в градусах
+          type: number
+          example: 60.630047
+      required:
+        - lat
+        - long
+    Errors:
+      description: Список ошибок
+      type: array
+      items:
+        $ref: "#/components/schemas/Error"
+    Error:
+      description: Описание ошибки
+      type: object
+      properties:
+        messageUuid:
+          description: UUID сообщения
+          type: string
+          format: uuid
+          example: ce98c53e-22d9-4427-a75b-cc88d7a681d2
+        errorCode:
+          description: Код ошибки
+          type: string
+          example: field_is_absent
+        errorMessage:
+          description: Описание ошибки
+          type: string
+          example: Не заполнено обязательное поле uuid секции header
+      required:
+        - errorCode
+        - errorMessage
+    OrderStatus:
+      description: Статус заказа
+      type: string
+      enum:
+        - draft
+        - new
+        - signed
+        - inProcess
+        - processed
+        - cancelled
+        - executionConfirmed
+        - invoicing
+        - invoiced
+        - payProcess
+        - paid
+      example: paid
+    TrackingOrderStatus:
+      description: Статус заказа
+      type: string
+      enum:
+        - new
+        - inProcess
+        - processed
+        - cancelled
+        - invoicing
+        - invoiced
+        - payProcess
+        - paid
+      example: inProcess
+    IntegrationSpotOrderStatus:
+      type: string
+      enum:
+        - NEW
+        - ACCEPTED
+        - REJECTED
+      description: Статус спота Клиента
+      
+    ResourceTypesDictionary:
+      type: array
+      items:
+        $ref: '#/components/schemas/ResourceTypeDTO'
+        
+    ResourceTypeDTO:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          description: "UUID типа транспортного средства"
+        title:
+          type: string
+          description: "Наименование типа транспортного средства"
+          example: "Изотерм 20т/92м3/33пал"
+        resourceSubtypeUuid:
+          type: string
+          format: uuid
+          description: "UUID класса подтипа транспортного средства"
+      required:
+        - uuid
+        - title
+        - resourceSubtypeUuid
+      
+    LoginDTO:
+      type: object
+      description: запрос логина пользователя
+      properties:
+        email:
+          description: Логин пользователя
+          type: string
+          example: "flastname@qwe.rty"
+        password:
+          description: Пароль пользователя
+          type: string
+          example: "R5cCI6IkpXVCJ9"
+      required:
+        - login
+        - password
+    RefreshDTO:
+      type: object
+      description: запрос обновления токена
+      properties:
+        token:
+          description: refresh token
+          type: string
+      required:
+        - token
+
+        
+    TokenDTO:
+      type: object
+      description: ответ на запрос логина пользователя
+      properties:
+        token:
+          description: Авторизационный токен
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+        refreshToken:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+      required:
+        - token
+        - refreshToken
+        
+    AuthError:
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+          example: 'Internal server error'
+        details:
+          type: string
+          example: 'Unexpected response from server: 400 / Bad Request'
+        errorCode:
+          type: string
+          example: "INVALID_CREDENTIALS_ERROR"
+          enum:
+            - INTERNAL_SERVER_ERROR
+            - INVALID_CREDENTIALS_ERROR
+            - LIMIT_ATTEMPTS_ERROR
+            - BLACK_RISK_ERROR
+
