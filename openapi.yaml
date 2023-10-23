@@ -2,7 +2,7 @@ openapi: 3.0.1
 info:
   title: order-client-api
   description: Внешнее API клиентского заказа для клиента
-  version: 2.1.0
+  version: 3.0.0
 servers:
   - url: https://preprod.gruzi.ru
     description: "Препрод"
