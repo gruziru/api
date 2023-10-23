@@ -141,7 +141,7 @@ curl --location 'https://{{server}}/oboz2-dictionary-resource-types-crud/v1/inte
 
 ```json5
 [
-   {
+  {
     "header": {
       "uuid": "805b4d3d-5f8c-47d6-82dd-e37442627472",
       "version": "1.0",
@@ -159,12 +159,19 @@ curl --location 'https://{{server}}/oboz2-dictionary-resource-types-crud/v1/inte
     "body": {
       "externalNumber": "R100711813",
       "clientInn": "7705739450",
+      "clientKpp": "123456789",
       "contractorInn": "7726630679",
+      "contractorKpp": "12456789",
       "species": "quota",
       "type": "standard",
+      "contractorSearchScenario": "QUOT_BOOK_AUC_AUTO",
       "date": "2020-09-23",
       "createdAt": "2020-09-23T08:47:00.333Z",
+      "contractRule": "MANUAL",
       "contractNumber": "R100711813",
+      "serviceRequirements": [
+        "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      ],
       "transportation": {
         "way": "ftl",
         "route": [
@@ -232,12 +239,13 @@ curl --location 'https://{{server}}/oboz2-dictionary-resource-types-crud/v1/inte
         "phone": "74957778899"
       },
       "comment": "Перевозка по договору №1 от 2020-09-22",
-      "shipment": [
+      "shipments": [
         "R100821571"
       ],
       "externalId": "R100711813",
-      "needCreateAsDraft" : false
-    }
+      "needCreateAsDraft": false
+    },
+    "receiverData": "string"
   }
 ]
 ```

@@ -2,7 +2,7 @@ openapi: 3.0.1
 info:
   title: order-client-api
   description: Внешнее API клиентского заказа для клиента
-  version: 2.0.0
+  version: 3.0.0
 servers:
   - url: https://preprod.gruzi.ru
     description: "Препрод"
@@ -360,10 +360,24 @@ components:
           type: string
           format: date
           example: "2020-09-23"
+        contractRule:
+          description: Правило выбора договора
+          type: string
+          enum: [ MANUAL,     # MANUAL - тариф будет задан вручную, в объекте tripTariff
+                  FIRST_ONE,  # FIRST_ONE - будет выбрано самое новое по дате создания тарифное соглашение, подходящее по параметрам к данному заказу
+                  BY_NUMBER   # BY_NUMBER - будет выбрано тарифное соглашение, номер которого указан в параметре contractNumber
+          ]
+          default: MANUAL
         contractNumber:
           description: Номер договора
           type: string
           example: R100711813
+        serviceRequirements:
+          type: array
+          description: "Требования к сервису и безопасности"
+          items:
+            type: string
+            format: uuid
         route:
           description: Маршрут для отслеживания в рамках заказа на трекинг
           type: array
@@ -1306,10 +1320,18 @@ components:
           description: ИНН клиента
           type: string
           example: "7705739450"
+        clientKpp:
+          description: КПП клиента
+          type: string
+          example: '123456789'
         contractorInn:
           description: ИНН контрагента, в адрес которго создаётся заказ
           type: string
           example: "7726630679"
+        contractorKpp:
+          description: КПП контрагента, в адрес которго создаётся заказ
+          type: string
+          example: '12456789'
         species:
           description: Вид заказа
           type: string
@@ -1325,8 +1347,13 @@ components:
             - standard
             - direct
             - any
+            - tms
+            - spot_auction
+            - booking
           default: standard
           example: standard
+        contractorSearchScenario:
+          $ref: '#/components/schemas/ContractorSearchScenario'
         date:
           description: Дата заказа
           type: string
@@ -1451,7 +1478,6 @@ components:
                 - Охлажденные продукты питания
                 - Песок
                 - Пиво и напитки пивные
-                - Пиво и напитки пивные
                 - Пиломатериалы и продукция деревообработки
                 - "Плиты ДСП, ДВП "
                 - Поддоны
@@ -1513,7 +1539,11 @@ components:
                   description: Единицы учёта груза
                   type: string
                   enum:
-                    - pallet
+                    - pallet   # Паллета
+                    - case     # Короб
+                    - each     # Штука
+                    - bag      # Мешок
+                    - unitload # Грузоместо
                   example: pallet
               required:
                 - type
@@ -1832,3 +1862,9 @@ components:
             - LIMIT_ATTEMPTS_ERROR
             - BLACK_RISK_ERROR
 
+    ContractorSearchScenario:
+      description: "Сценарий подбора исполнителя"
+      type: string
+      enum: [
+        'QUOT_BOOK_AUC_AUTO'    # Автоматический сценарий Квота-Букинг-Аукцион
+      ]
